@@ -1,0 +1,37 @@
+steps:
+  - name: test
+    image: golang:1.24-alpine
+    commands:
+      - test -z "$(gofmt -l .)"
+      - go vet ./...
+      - go test ./...
+
+  - name: build
+    image: goreleaser/goreleaser:v2.20.0
+    depends_on: [test]
+    commands:
+      - goreleaser build --snapshot --clean
+
+  - name: e2e
+    image: mcr.microsoft.com/playwright:v1.49.1-noble
+    depends_on: [build]
+    commands:
+      - apt-get update -qq && apt-get install -y -qq --no-install-recommends mosquitto >/dev/null
+      - printf 'listener 1883\nallow_anonymous true\n' > /tmp/mosquitto.conf
+      - mosquitto -c /tmp/mosquitto.conf -d
+      - BIN=$(find dist -type f -name mqttree | head -1) && echo "using $BIN"
+      - mkdir -p /tmp/mqttree-data
+      - MQTTREE_DATA_DIR=/tmp/mqttree-data MQTTREE_SECRET_KEY_FILE=/tmp/mqttree-data/secret.key "$BIN" >/tmp/mqttree.log 2>&1 &
+      - for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8080/healthz >/dev/null && break; sleep 0.5; done
+      - cd e2e && npm ci && npx playwright test
+
+  - name: release
+    image: goreleaser/goreleaser:v2.20.0
+    depends_on: [test]
+    when:
+      - event: tag
+    environment:
+      GITEA_TOKEN:
+        from_secret: forgejo_token
+    commands:
+      - goreleaser release --clean

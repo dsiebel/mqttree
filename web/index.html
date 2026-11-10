@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>mqttree</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">mqttree</span>
+    <select id="connection-select" aria-label="Active connection"></select>
+    <span id="status-dot" class="dot" title="disconnected"></span>
+    <button id="toggle-connection" class="btn" type="button">Connect</button>
+    <div class="search-group">
+      <div class="search-field">
+        <input id="search" type="search" placeholder="Filter topics" aria-label="Filter topics" autocomplete="off" spellcheck="false">
+        <button id="clear-search" class="search-clear hidden" type="button" title="Clear filter" aria-label="Clear filter">
+          <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 4l8 8M12 4l-8 8"/>
+          </svg>
+        </button>
+      </div>
+      <button id="theme-toggle" class="btn icon" type="button" title="Switch to light theme" aria-label="Switch to light theme"></button>
+      <button id="open-settings" class="btn icon" type="button" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true">
+          <path d="M2 5h12M2 11h12"/>
+          <circle cx="6" cy="5" r="1.7"/>
+          <circle cx="10.5" cy="11" r="1.7"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="tree-pane" aria-label="Topic tree">
+      <div class="tree-toolbar">
+        <button id="toggle-all" class="btn icon" type="button" data-state="expand" title="Expand all" aria-label="Expand all topics">
+          <svg class="icon-expand" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true">
+            <rect x="2.5" y="2.5" width="11" height="11" rx="1"/>
+            <path d="M8 5.5v5M5.5 8h5"/>
+          </svg>
+          <svg class="icon-collapse" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true">
+            <rect x="2.5" y="2.5" width="11" height="11" rx="1"/>
+            <path d="M5.5 8h5"/>
+          </svg>
+        </button>
+        <span id="tree-count" class="tree-count"></span>
+      </div>
+      <div class="tree-scroll">
+        <p id="tree-empty" class="empty">No topics yet. Pick a connection and connect.</p>
+        <div id="tree" class="tree" role="tree"></div>
+      </div>
+    </section>
+
+    <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" aria-label="Resize topic tree" tabindex="0"></div>
+
+    <section id="detail" class="detail-pane" aria-label="Topic detail">
+      <p id="detail-empty" class="empty">Select a topic to inspect it.</p>
+      <div id="detail-body" class="detail-body hidden">
+        <div class="detail-head">
+          <button id="back" class="btn icon" type="button" aria-label="Back to topics">←</button>
+          <code id="topic-path"></code>
+          <button id="copy-topic" class="btn icon copy-topic" type="button" title="Copy topic" aria-label="Copy topic"></button>
+          <span id="topic-badges" class="badges"></span>
+        </div>
+
+        <section class="block">
+          <div class="block-head">
+            <h2>Latest payload</h2>
+            <span id="payload-meta" class="muted"></span>
+          </div>
+          <div class="payload-wrap">
+            <pre id="latest-payload" class="payload"></pre>
+            <button id="copy-payload" class="btn icon copy-btn" type="button" title="Copy payload" aria-label="Copy payload"></button>
+          </div>
+        </section>
+
+        <section class="block">
+          <div class="block-head">
+            <h2>History</h2>
+            <span id="history-meta" class="muted"></span>
+          </div>
+          <ol id="history" class="history"></ol>
+          <button id="load-older" class="btn hidden" type="button">Load older</button>
+        </section>
+
+        <form id="publish-form" class="block publish">
+          <div class="block-head"><h2>Publish</h2></div>
+          <label class="field">Topic
+            <input id="publish-topic" required autocomplete="off" spellcheck="false">
+          </label>
+          <label class="field">Payload
+            <textarea id="publish-payload" rows="3" spellcheck="false"></textarea>
+          </label>
+          <div class="row">
+            <label class="field compact">QoS
+              <select id="publish-qos">
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+              </select>
+            </label>
+            <label class="check"><input id="publish-retain" type="checkbox"> Retain</label>
+            <button class="btn primary" type="submit">Send</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="settings" class="settings" tabindex="-1">
+    <div class="dialog-head">
+      <h2>Settings</h2>
+      <form method="dialog"><button class="btn icon" aria-label="Close">✕</button></form>
+    </div>
+
+    <section class="block">
+      <div class="block-head"><h3>Retention</h3></div>
+      <div class="grid">
+        <label class="field">Keep messages (hours)
+          <input id="retention-hours" type="number" min="1" max="8760" required>
+        </label>
+        <label class="field">Database cap (MiB)
+          <input id="max-db-mib" type="number" min="16" max="65536" required>
+        </label>
+        <label class="field">Payload cap (KiB)
+          <input id="max-payload-kib" type="number" min="1" max="4096" required>
+        </label>
+      </div>
+      <button id="save-settings" class="btn primary" type="button">Save retention</button>
+    </section>
+
+    <section class="block">
+      <div class="block-head"><h3>Stored data</h3><span id="data-meta" class="muted"></span></div>
+      <p class="hint">Deletes every topic and message for the selected connection. The connection and its credentials stay.</p>
+      <button id="clear-tree" class="btn danger" type="button">Clear stored messages</button>
+    </section>
+
+    <section class="block">
+      <div class="block-head"><h3>Connections</h3></div>
+      <ul id="connection-list" class="connection-list"></ul>
+
+      <form id="connection-form" class="editor">
+        <h4 id="editor-title">Add connection</h4>
+        <input id="conn-id" type="hidden">
+        <div class="grid">
+          <label class="field">Name <input id="conn-name" required autocomplete="off"></label>
+          <label class="field">Host <input id="conn-host" required autocomplete="off" spellcheck="false"></label>
+          <label class="field">Port <input id="conn-port" type="number" min="1" max="65535" value="1883" required></label>
+          <label class="field">Client ID <input id="conn-client-id" placeholder="generated" autocomplete="off" spellcheck="false"></label>
+          <label class="field">Username <input id="conn-username" autocomplete="off" spellcheck="false"></label>
+          <label class="field">Password <input id="conn-password" type="password" placeholder="unchanged" autocomplete="new-password"></label>
+        </div>
+        <label class="check"><input id="conn-clear-password" type="checkbox"> Clear stored password</label>
+        <label class="check"><input id="conn-tls" type="checkbox"> TLS</label>
+        <label class="check"><input id="conn-tls-insecure" type="checkbox"> Skip TLS verification</label>
+        <label class="field">CA certificate (PEM)
+          <textarea id="conn-ca" rows="3" spellcheck="false"></textarea>
+        </label>
+        <div class="grid">
+          <label class="field">Topic filter <input id="conn-filter" value="#" spellcheck="false"></label>
+          <label class="field compact">QoS
+            <select id="conn-qos">
+              <option value="0">0</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+            </select>
+          </label>
+        </div>
+        <label class="check"><input id="conn-enabled" type="checkbox" checked> Connect on startup</label>
+        <div class="row">
+          <button class="btn primary" type="submit">Save connection</button>
+          <button id="conn-reset" class="btn" type="button">New</button>
+        </div>
+      </form>
+    </section>
+  </dialog>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

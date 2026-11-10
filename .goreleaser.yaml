@@ -1,0 +1,59 @@
+version: 2
+
+project_name: mqttree
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: mqttree
+    main: .
+    binary: mqttree
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .Commit }}
+      - -X main.date={{ .Date }}
+
+archives:
+  - id: mqttree
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - LICENSE
+      - README.md
+      - SECURITY.md
+      - CHANGELOG.md
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^chore:'
+
+release:
+  draft: false
+  gitea:
+    owner: dsiebel
+    name: mqttree
+
+gitea_urls:
+  api: https://forgejo.home.dsiebel.de/api/v1
+  download: https://forgejo.home.dsiebel.de
