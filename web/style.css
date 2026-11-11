@@ -400,7 +400,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
 }
 .block-head h2, .block-head h3 {
   font-size: 10px;
@@ -432,7 +432,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   transition: transform 120ms ease;
 }
 .block-toggle[aria-expanded='true'] .chev { transform: rotate(90deg); }
-#history-body { display: flex; flex-direction: column; gap: 6px; }
+#history-body { display: flex; flex-direction: column; gap: 8px; }
 .muted { color: var(--muted); font-size: 11px; }
 
 .j-key { color: var(--accent); }
@@ -528,11 +528,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   padding-right: 26px;
 }
 
-.publish { display: flex; flex-direction: column; gap: 6px; }
+.publish { display: flex; flex-direction: column; gap: 8px; }
 .field {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   font-size: 11px;
   color: var(--muted);
   min-width: 0;
@@ -555,7 +555,7 @@ input[type="checkbox"] {
 .grid {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
 }
 
 .toast {
@@ -600,7 +600,7 @@ input[type="checkbox"] {
   border-radius: var(--radius-lg);
   background: var(--bg);
   color: var(--fg);
-  padding: 0 14px 20px;
+  padding: 0 14px 16px;
   overflow: auto;
 }
 .settings::backdrop { background: rgba(0, 0, 0, 0.62); }
@@ -612,28 +612,37 @@ input[type="checkbox"] {
   position: sticky;
   top: 0;
   background: var(--bg);
-  padding: 10px 0 8px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--border);
   z-index: 2;
 }
 .dialog-head h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.01em; }
 
-.settings .block { margin-top: 12px; border-top: 0; padding-top: 0; }
+.settings .block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  border-top: 0;
+  padding-top: 0;
+}
+.settings .block-head { margin-bottom: 0; }
+/* Column sections stretch their controls; buttons stay content-sized. */
+.settings .block > .btn { align-self: flex-start; }
 
 .editor {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
   border-top: 1px solid var(--border);
-  padding-top: 10px;
-  margin-top: 8px;
+  padding-top: 12px;
 }
-.editor h4 { margin: 0 0 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
-.hint { margin: 0 0 8px; font-size: 11.5px; color: var(--muted); }
+.editor h4 { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.hint { margin: 0; font-size: 11.5px; color: var(--muted); }
 
 .connection-list {
   list-style: none;
-  margin: 0 0 10px;
+  margin: 0;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -642,7 +651,7 @@ input[type="checkbox"] {
 .connection-list li {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   padding: 5px 8px;
   background: var(--surface);
   border-top: 1px solid var(--border);
