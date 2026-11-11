@@ -19,6 +19,8 @@
   --err: #d96a5e;
   --row-hot: rgba(53, 195, 155, 0.13);
   --mark-bg: rgba(53, 195, 155, 0.3);
+  --diff-add: rgba(53, 195, 155, 0.24);
+  --diff-del: rgba(217, 106, 94, 0.28);
   --json-str: #a9c1b6;
   --radius: 3px;
   --radius-lg: 5px;
@@ -45,6 +47,8 @@
     --err: #b4443a;
     --row-hot: rgba(15, 134, 106, 0.1);
     --mark-bg: rgba(15, 134, 106, 0.2);
+    --diff-add: rgba(15, 134, 106, 0.18);
+    --diff-del: rgba(180, 68, 58, 0.2);
     --json-str: #3f6457;
 }
 
@@ -66,6 +70,8 @@
     --err: #b4443a;
     --row-hot: rgba(15, 134, 106, 0.1);
     --mark-bg: rgba(15, 134, 106, 0.2);
+    --diff-add: rgba(15, 134, 106, 0.18);
+    --diff-del: rgba(180, 68, 58, 0.2);
     --json-str: #3f6457;
   }
 }
@@ -156,13 +162,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 }
 
 #connection-select { max-width: 200px; flex: 0 1 160px; }
-.search-group {
+.topbar-actions {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-left: auto;
-  flex: 0 1 400px;
-  min-width: 0;
 }
 .search-field {
   position: relative;
@@ -170,7 +174,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   flex: 1 1 auto;
   min-width: 0;
 }
-#search { flex: 1 1 auto; min-width: 0; padding-right: 26px; }
+#search { flex: 1 1 auto; min-width: 0; height: 22px; font-size: 12px; padding-right: 26px; }
 .search-clear {
   position: absolute;
   right: 3px;
@@ -235,8 +239,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .btn.danger { color: var(--err); border-color: var(--err); }
 .btn.danger:hover { background: var(--err); border-color: var(--err); color: #fff; }
 .tree-toolbar .btn.danger:hover { color: var(--err); border-color: var(--err); }
-.toolbar-spacer { flex: 1; }
-.tree-count { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.tree-toolbar .search-field { flex: 1 1 auto; margin-left: 2px; }
 
 .tree-scroll {
   flex: 1;
@@ -407,6 +410,29 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   margin: 0;
   font-weight: 600;
 }
+.block-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+.block-toggle:hover { color: var(--fg); background: none; }
+.block-toggle .chev {
+  font-size: 12px;
+  line-height: 1;
+  transition: transform 120ms ease;
+}
+.block-toggle[aria-expanded='true'] .chev { transform: rotate(90deg); }
+#history-body { display: flex; flex-direction: column; gap: 6px; }
 .muted { color: var(--muted); font-size: 11px; }
 
 .j-key { color: var(--accent); }
@@ -449,6 +475,25 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 6px 8px;
+}
+
+/* Live payload updates: changed lines flash, then the background fades out.
+   JS re-renders the clean payload once the animation finishes. */
+.payload .diff-add,
+.payload .diff-del { border-radius: 2px; }
+.payload .diff-add { animation: diff-fade-add 2.6s ease-out forwards; }
+.payload .diff-del { animation: diff-fade-del 2.6s ease-out forwards; }
+@keyframes diff-fade-add {
+  from { background-color: var(--diff-add); }
+  to { background-color: transparent; }
+}
+@keyframes diff-fade-del {
+  from { background-color: var(--diff-del); }
+  to { background-color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .payload .diff-add { background-color: var(--diff-add); animation: none; }
+  .payload .diff-del { background-color: var(--diff-del); animation: none; }
 }
 
 .history {
@@ -516,7 +561,7 @@ input[type="checkbox"] {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 16px;
+  bottom: 32px;
   transform: translateX(-50%);
   background: var(--surface-3);
   border: 1px solid var(--border-strong);
@@ -528,6 +573,23 @@ input[type="checkbox"] {
   z-index: 20;
 }
 .toast.err { border-left-color: var(--err); }
+
+/* ------------------------------------------------------------ status bar */
+
+.statusbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 2px 10px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
 
 /* -------------------------------------------------------------- settings */
 
@@ -605,7 +667,9 @@ input[type="checkbox"] {
 body.resizing { cursor: col-resize; user-select: none; }
 
 @media (max-width: 640px) {
-  .search-group { flex: 1 1 100%; margin-left: 0; }
+  /* Keep the action buttons on the same row: the connection select shrinks. */
+  .topbar { flex-wrap: nowrap; }
+  #connection-select { flex: 1 1 auto; max-width: none; }
 }
 
 @media (max-width: 859px) {

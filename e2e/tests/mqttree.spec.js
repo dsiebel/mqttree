@@ -28,8 +28,10 @@ test('starts with the expected controls', async ({ page }) => {
   await expect(page.locator('#tree-empty')).toBeVisible();
   await expect(page.locator('#toggle-all')).toBeVisible();
   await expect(page.locator('#theme-toggle')).toBeVisible();
-  await expect(page.locator('#search')).toBeVisible();
+  await expect(page.locator('.tree-toolbar #search')).toBeVisible();
   await expect(page.locator('#clear-search')).toBeHidden();
+  await expect(page.locator('#status-topics')).toBeVisible();
+  await expect(page.locator('#status-db')).toContainText(/\d+ (B|KiB|MiB)/);
 });
 
 test('creates a connection and shows broker activity', async ({ page }) => {
@@ -111,6 +113,70 @@ test('switches theme and remembers the choice', async ({ page }) => {
   await expect(page.locator('html')).toHaveAttribute('data-theme', expected);
 });
 
+test('collapses history and pages it ten at a time', async ({ page }) => {
+  const state = await bootstrap(page);
+  const connection = state.connections.find((candidate) => candidate.name === 'e2e');
+  for (let value = 0; value < 12; value += 1) {
+    const response = await page.request.post('/api/publish', {
+      data: {
+        connection_id: connection.id,
+        topic: 'home/kitchen/humidity',
+        payload: JSON.stringify({ value }),
+        qos: 1,
+        retain: false,
+      },
+    });
+    expect(response.ok()).toBeTruthy();
+  }
+  await expect.poll(async () => (await bootstrap(page)).stats.messages).toBe(13);
+
+  await page.goto('/');
+  await page.locator('.node[data-path="home"] > .row > .chev-btn').click();
+  await page.locator('.node[data-path="home/kitchen"] > .row > .chev-btn').click();
+  await page.locator('.node[data-path="home/kitchen/humidity"] > .row').click();
+  await expect(page.locator('#topic-path')).toHaveText('home/kitchen/humidity');
+
+  // Collapsed by default, and the first page stops at ten entries.
+  await expect(page.locator('#toggle-history')).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#history-body')).toBeHidden();
+  await page.locator('#toggle-history').click();
+  await expect(page.locator('#history-body')).toBeVisible();
+  await expect(page.locator('#history .msg')).toHaveCount(10);
+  await expect(page.locator('#load-older')).toBeVisible();
+
+  await page.locator('#load-older').click();
+  await expect(page.locator('#history .msg')).toHaveCount(12);
+  await expect(page.locator('#load-older')).toBeHidden();
+});
+
+test('diffs the latest payload on live updates', async ({ page }) => {
+  const state = await bootstrap(page);
+  const connection = state.connections.find((candidate) => candidate.name === 'e2e');
+  await page.goto('/');
+  await page.locator('.node[data-path="home"] > .row > .chev-btn').click();
+  await page.locator('.node[data-path="home/kitchen"] > .row > .chev-btn').click();
+  await page.locator('.node[data-path="home/kitchen/humidity"] > .row').click();
+  await expect(page.locator('#latest-payload')).toContainText('11');
+
+  const response = await page.request.post('/api/publish', {
+    data: {
+      connection_id: connection.id,
+      topic: 'home/kitchen/humidity',
+      payload: JSON.stringify({ value: 99 }),
+      qos: 1,
+      retain: false,
+    },
+  });
+  expect(response.ok()).toBeTruthy();
+
+  await expect(page.locator('#latest-payload .diff-add')).toContainText('99');
+  await expect(page.locator('#latest-payload .diff-del')).toContainText('11');
+  // The highlight fades out and the pane settles on the new payload alone.
+  await expect(page.locator('#latest-payload .diff-del')).toHaveCount(0, { timeout: 8000 });
+  await expect(page.locator('#latest-payload')).toContainText('99');
+  await expect(page.locator('#latest-payload')).not.toContainText('11');
+});
+
 test('clears stored data for the connection', async ({ page }) => {
   page.on('dialog', (dialog) => dialog.accept());
   await page.goto('/');
@@ -120,7 +186,8 @@ test('clears stored data for the connection', async ({ page }) => {
   await expect(page.locator('#toast')).toContainText('stored messages cleared');
   await closeSettings(page);
   await expect(page.locator('#tree-empty')).toBeVisible();
-  await expect(page.locator('#tree-count')).toHaveText('');
+  await expect(page.locator('#status-topics')).toHaveText('0 topics');
+  await expect(page.locator('#status-messages')).toHaveText('0 messages');
   const state = await bootstrap(page);
   expect(state.stats.messages).toBe(0);
   expect(state.connections).toHaveLength(1);

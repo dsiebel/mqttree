@@ -16,16 +16,20 @@ SQLite file and one HTTP port.
 
 - **Topic tree** — subscribes to a filter (`#` by default), shows every topic as
   a collapsible tree with its last value, retained marker and activity highlight.
+  The topic filter sits in the sidebar header.
 - **History** — every message is stored per topic and pages back in the detail
-  view. JSON payloads are pretty-printed and syntax highlighted, binary payloads
-  are shown as base64.
+  view, collapsed by default and ten entries per page. JSON payloads are
+  pretty-printed and syntax highlighted, binary payloads are shown as base64.
+  Live updates to the latest payload are diffed line by line with a red/green
+  highlight that fades out.
 - **Retention** — per-message expiry from MQTT v5, otherwise a configurable
   retention window, plus a database size cap that prunes oldest first.
 - **Saved connections** — multiple brokers, TLS with a custom CA, username and
   password. Passwords are sealed with XChaCha20-Poly1305 using a key file that is
   separate from the database.
 - **Publish** — send a message to any topic with QoS and retain.
-- **Layout** — resizable tree, dark/light theme, compact mobile view.
+- **Layout** — resizable tree, dark/light theme, compact mobile view and a
+  status bar with stored topic/message counts and database size.
 
 ## Quick start
 

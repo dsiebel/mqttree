@@ -14,6 +14,11 @@ First release.
   collapsible tree with last value, retained marker and activity highlighting.
 - Per-topic message history with paging, JSON pretty-printing and syntax
   highlighting, base64 rendering for binary payloads and copy buttons.
+- Message history collapses by default and loads ten entries per page; live
+  payload updates are diffed line by line with a red/green highlight that fades
+  out.
+- Bottom status bar with stored topic and message counts plus database size; the
+  topic filter moved into the sidebar header.
 - Retention: MQTT v5 message-expiry interval first, then a configurable
   retention window, then a database size cap that prunes oldest messages.
 - Saved broker connections with TLS and custom CA support; passwords sealed with

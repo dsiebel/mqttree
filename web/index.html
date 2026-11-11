@@ -14,15 +14,7 @@
     <select id="connection-select" aria-label="Active connection"></select>
     <span id="status-dot" class="dot" title="disconnected"></span>
     <button id="toggle-connection" class="btn" type="button">Connect</button>
-    <div class="search-group">
-      <div class="search-field">
-        <input id="search" type="search" placeholder="Filter topics" aria-label="Filter topics" autocomplete="off" spellcheck="false">
-        <button id="clear-search" class="search-clear hidden" type="button" title="Clear filter" aria-label="Clear filter">
-          <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
-            <path d="M4 4l8 8M12 4l-8 8"/>
-          </svg>
-        </button>
-      </div>
+    <div class="topbar-actions">
       <button id="theme-toggle" class="btn icon" type="button" title="Switch to light theme" aria-label="Switch to light theme"></button>
       <button id="open-settings" class="btn icon" type="button" title="Settings" aria-label="Settings">
         <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true">
@@ -47,7 +39,14 @@
             <path d="M5.5 8h5"/>
           </svg>
         </button>
-        <span id="tree-count" class="tree-count"></span>
+        <div class="search-field">
+          <input id="search" type="search" placeholder="Filter topics" aria-label="Filter topics" autocomplete="off" spellcheck="false">
+          <button id="clear-search" class="search-clear hidden" type="button" title="Clear filter" aria-label="Clear filter">
+            <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+              <path d="M4 4l8 8M12 4l-8 8"/>
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="tree-scroll">
         <p id="tree-empty" class="empty">No topics yet. Pick a connection and connect.</p>
@@ -78,13 +77,19 @@
           </div>
         </section>
 
-        <section class="block">
+        <section class="block history-block">
           <div class="block-head">
-            <h2>History</h2>
+            <h2>
+              <button id="toggle-history" class="block-toggle" type="button" aria-expanded="false" aria-controls="history-body" title="Show history">
+                <span class="chev" aria-hidden="true">›</span>History
+              </button>
+            </h2>
             <span id="history-meta" class="muted"></span>
           </div>
-          <ol id="history" class="history"></ol>
-          <button id="load-older" class="btn hidden" type="button">Load older</button>
+          <div id="history-body" class="history-body hidden">
+            <ol id="history" class="history"></ol>
+            <button id="load-older" class="btn hidden" type="button">Load older</button>
+          </div>
         </section>
 
         <form id="publish-form" class="block publish">
@@ -178,6 +183,12 @@
       </form>
     </section>
   </dialog>
+
+  <footer class="statusbar" aria-label="Stored data">
+    <span id="status-topics" title="Topics stored in the database"></span>
+    <span id="status-messages" title="Messages stored in the database"></span>
+    <span id="status-db" title="Live database size and cap"></span>
+  </footer>
 
   <div id="toast" class="toast hidden" role="status"></div>
   <script type="module" src="/app.js"></script>

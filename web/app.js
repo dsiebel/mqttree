@@ -11,6 +11,8 @@ const state = {
   selected: "",
   history: [],
   oldestId: 0,
+  latestText: "",
+  latestGen: 0,
   expanded: new Set(),
   ws: null,
   wsAttempt: 0,
@@ -172,6 +174,16 @@ function sizeLabel(b64) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
 }
 
+function plural(count, word) {
+  return `${count} ${word}${count === 1 ? '' : 's'}`;
+}
+
+function bytesLabel(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+}
+
 function highlightJson(text) {
   return escapeHtml(text).replace(/("(?:\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(?:\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g, (match) => {
     let kind = 'j-num';
@@ -182,20 +194,98 @@ function highlightJson(text) {
   });
 }
 
-function renderPayloadHtml(text, b64, truncated) {
+function payloadView(text, b64, truncated) {
   if (text) {
     const trimmed = text.trim();
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
       try {
-        const pretty = JSON.stringify(JSON.parse(trimmed), null, 2) + (truncated ? '\n… truncated' : '');
-        return highlightJson(pretty);
+        return { text: JSON.stringify(JSON.parse(trimmed), null, 2) + (truncated ? '\n… truncated' : ''), json: true };
       } catch {
         /* not JSON, fall through */
       }
     }
-    return escapeHtml(text) + (truncated ? '\n… truncated' : '');
+    return { text: text + (truncated ? '\n… truncated' : ''), json: false };
   }
-  return escapeHtml(`binary payload, ${sizeLabel(b64)}\nbase64: ${b64.slice(0, 512)}${b64.length > 512 ? '…' : ''}`);
+  return {
+    text: `binary payload, ${sizeLabel(b64)}\nbase64: ${b64.slice(0, 512)}${b64.length > 512 ? '…' : ''}`,
+    json: false,
+  };
+}
+
+function renderPayloadHtml(view) {
+  return view.json ? highlightJson(view.text) : escapeHtml(view.text);
+}
+
+// Line-level LCS: a changed value renders as one removed and one added line,
+// which reads better than replacing the whole payload. The table is capped so
+// an absurd payload falls back to a plain replace instead of eating memory.
+function diffLines(before, after) {
+  const older = before.split('\n');
+  const newer = after.split('\n');
+  if (older.length * newer.length > 500000) {
+    return [
+      ...older.map((text) => ({ kind: '-', text })),
+      ...newer.map((text) => ({ kind: '+', text })),
+    ];
+  }
+  const width = newer.length + 1;
+  const lengths = new Uint32Array((older.length + 1) * width);
+  for (let i = older.length - 1; i >= 0; i -= 1) {
+    for (let j = newer.length - 1; j >= 0; j -= 1) {
+      lengths[i * width + j] = older[i] === newer[j]
+        ? lengths[(i + 1) * width + (j + 1)] + 1
+        : Math.max(lengths[(i + 1) * width + j], lengths[i * width + (j + 1)]);
+    }
+  }
+  const rows = [];
+  let i = 0;
+  let j = 0;
+  while (i < older.length && j < newer.length) {
+    if (older[i] === newer[j]) {
+      rows.push({ kind: ' ', text: older[i] });
+      i += 1;
+      j += 1;
+    } else if (lengths[(i + 1) * width + j] >= lengths[i * width + (j + 1)]) {
+      rows.push({ kind: '-', text: older[i] });
+      i += 1;
+    } else {
+      rows.push({ kind: '+', text: newer[j] });
+      j += 1;
+    }
+  }
+  while (i < older.length) rows.push({ kind: '-', text: older[i++] });
+  while (j < newer.length) rows.push({ kind: '+', text: newer[j++] });
+  return rows;
+}
+
+function renderPayloadDiff(before, view) {
+  return diffLines(before, view.text)
+    .map((row) => {
+      const body = view.json ? highlightJson(row.text) : escapeHtml(row.text);
+      if (row.kind === '+') return `<span class="diff-add">${body || '&#8203;'}</span>`;
+      if (row.kind === '-') return `<span class="diff-del">${body || '&#8203;'}</span>`;
+      return body;
+    })
+    .join('\n');
+}
+
+const DIFF_FADE_MS = 2700;
+
+// A live update diffs against what the pane currently shows, then falls back to
+// the clean payload once the red/green backgrounds have faded out.
+function renderLatestPayload(view, previous) {
+  const payload = $('latest-payload');
+  state.latestText = view.text;
+  state.latestGen += 1;
+  const generation = state.latestGen;
+  if (!previous || previous === view.text) {
+    payload.innerHTML = renderPayloadHtml(view);
+    return;
+  }
+  payload.innerHTML = renderPayloadDiff(previous, view);
+  setTimeout(() => {
+    if (generation === state.latestGen) payload.innerHTML = renderPayloadHtml(view);
+  }, DIFF_FADE_MS);
 }
 
 // ------------------------------------------------------------------- tree
@@ -370,9 +460,7 @@ function resetTree() {
 }
 
 function updateTreeEmpty() {
-  const hasTopics = state.nodes.size > 0;
-  $('tree-empty').classList.toggle('hidden', hasTopics);
-  $('tree-count').textContent = state.topics.size > 0 ? `${state.topics.size} topics` : '';
+  $('tree-empty').classList.toggle('hidden', state.nodes.size > 0);
 }
 
 async function loadTree() {
@@ -460,6 +548,9 @@ function highlightSelection() {
 
 async function selectTopic(topic) {
   state.selected = topic;
+  state.history = [];
+  state.oldestId = 0;
+  setHistoryOpen(false);
   expandAncestors(topic);
   document.body.classList.add('detail-open');
   highlightSelection();
@@ -471,9 +562,13 @@ async function selectTopic(topic) {
 
   const topicState = state.topics.get(topic);
   renderDetailHead(topicState);
-  $('latest-payload').innerHTML = topicState
-    ? renderPayloadHtml(topicState.text || '', topicState.payload_b64 || '', topicState.truncated)
-    : 'no message stored yet';
+  if (topicState) {
+    renderLatestPayload(payloadView(topicState.text || '', topicState.payload_b64 || '', topicState.truncated), null);
+  } else {
+    state.latestText = '';
+    state.latestGen += 1;
+    $('latest-payload').textContent = 'no message stored yet';
+  }
   $('payload-meta').textContent = topicState
     ? `${sizeLabel(topicState.payload_b64 || '')} · ${topicState.retained ? 'retained · ' : ''}${fmtTime(topicState.received_at)}`
     : '';
@@ -495,6 +590,15 @@ function renderDetailHead(topicState) {
   add(`qos ${topicState.qos ?? 0}`);
 }
 
+const HISTORY_PAGE = 10;
+
+function setHistoryOpen(open) {
+  $('history-body').classList.toggle('hidden', !open);
+  const button = $('toggle-history');
+  button.setAttribute('aria-expanded', String(open));
+  button.title = open ? 'Hide history' : 'Show history';
+}
+
 function historyItem(message, live = false) {
   const item = document.createElement('li');
   item.className = 'msg';
@@ -506,7 +610,7 @@ function historyItem(message, live = false) {
   meta.textContent = `${sizeLabel(message.payload_b64 || '')} · qos ${message.qos ?? 0}${message.retained ? ' · retained' : ''}${live ? ' · live' : ''}`;
   head.append(time, meta);
   const pre = document.createElement('pre');
-  pre.innerHTML = renderPayloadHtml(message.text || '', message.payload_b64 || '', message.truncated);
+  pre.innerHTML = renderPayloadHtml(payloadView(message.text || '', message.payload_b64 || '', message.truncated));
   const copy = document.createElement('button');
   copy.type = 'button';
   copy.className = 'btn icon copy-btn';
@@ -529,7 +633,7 @@ function renderHistory() {
 
 async function loadHistory(topic, before = 0) {
   try {
-    const data = await api(`/api/messages?connection=${state.activeId}&topic=${encodeURIComponent(topic)}&limit=200${before ? `&before=${before}` : ''}`);
+    const data = await api(`/api/messages?connection=${state.activeId}&topic=${encodeURIComponent(topic)}&limit=${HISTORY_PAGE}${before ? `&before=${before}` : ''}`);
     if (before) {
       state.history = state.history.concat(data.messages);
     } else {
@@ -541,13 +645,15 @@ async function loadHistory(topic, before = 0) {
       state.oldestId = before ? Math.min(state.oldestId || Infinity, ...ids) : Math.min(...ids);
     }
     renderHistory();
-    $('load-older').classList.toggle('hidden', data.messages.length < 200);
+    $('load-older').classList.toggle('hidden', data.messages.length < HISTORY_PAGE);
   } catch (error) {
     toast(error.message, true);
   }
 }
 
 function prependLiveHistory(message) {
+  // A live event can race the history fetch that already contains it.
+  if (state.history.some((entry) => entry.id === message.id)) return;
   state.history.unshift(message);
   if (state.history.length > 400) state.history.pop();
   $('history').prepend(historyItem(message, true));
@@ -605,14 +711,26 @@ function renderStatus() {
   button.textContent = running ? 'Disconnect' : 'Connect';
 }
 
+function renderStatusBar() {
+  const stats = state.stats;
+  $('status-topics').textContent = stats ? plural(stats.topics, 'topic') : '';
+  $('status-messages').textContent = stats ? plural(stats.messages, 'message') : '';
+  $('status-db').textContent = stats
+    ? state.settings
+      ? `db ${bytesLabel(stats.db_bytes)} / ${bytesLabel(state.settings.max_db_bytes)}`
+      : `db ${bytesLabel(stats.db_bytes)}`
+    : '';
+}
+
 function renderSettings() {
   if (!state.settings) return;
   $('retention-hours').value = String(state.settings.retention_hours);
   $('max-db-mib').value = String(Math.round(state.settings.max_db_bytes / (1024 * 1024)));
   $('max-payload-kib').value = String(Math.round(state.settings.max_payload_bytes / 1024));
   $('data-meta').textContent = state.stats
-    ? `${state.stats.topics} topics · ${state.stats.messages} messages · ${(state.stats.db_bytes / (1024 * 1024)).toFixed(1)} MiB`
+    ? `${plural(state.stats.topics, 'topic')} · ${plural(state.stats.messages, 'message')} · ${bytesLabel(state.stats.db_bytes)}`
     : '';
+  renderStatusBar();
 }
 
 function renderConnectionList() {
@@ -823,6 +941,8 @@ async function clearTree() {
     await api(`/api/connections/${state.activeId}/clear`, { method: 'POST' });
     state.selected = '';
     state.history = [];
+    state.latestText = '';
+    state.latestGen += 1;
     document.body.classList.remove('detail-open');
     $('detail').classList.remove('open');
     $('detail-body').classList.add('hidden');
@@ -889,14 +1009,20 @@ function handleEvent(event) {
     payload_b64: message.payload_b64,
     text: message.text,
   };
+  const known = state.topics.has(message.topic);
   state.topics.set(message.topic, topic);
   const node = ensureTopicNode(message.topic);
   updateLeaf(node, message);
   markTopicHot(message.topic);
   updateTreeEmpty();
+  if (state.stats) {
+    state.stats.messages += 1;
+    if (!known) state.stats.topics += 1;
+    renderStatusBar();
+  }
   if (state.filter) applyFilter(state.filter);
   if (state.selected === message.topic) {
-    $('latest-payload').innerHTML = renderPayloadHtml(message.text || '', message.payload_b64, message.truncated);
+    renderLatestPayload(payloadView(message.text || '', message.payload_b64, message.truncated), state.latestText);
     $('payload-meta').textContent = `${sizeLabel(message.payload_b64)} · ${message.retained ? 'retained · ' : ''}${fmtTime(message.ts)}`;
     renderDetailHead(topic);
     prependLiveHistory(message);
@@ -930,7 +1056,10 @@ function wire() {
   $('copy-topic').innerHTML = COPY_ICON;
   $('copy-payload').innerHTML = COPY_ICON;
   $('copy-topic').addEventListener('click', () => copyText($('topic-path').textContent, 'topic copied'));
-  $('copy-payload').addEventListener('click', () => copyText($('latest-payload').textContent, 'payload copied'));
+  $('copy-payload').addEventListener('click', () => copyText(state.latestText, 'payload copied'));
+  $('toggle-history').addEventListener('click', () => {
+    setHistoryOpen($('history-body').classList.contains('hidden'));
+  });
 
   $('clear-search').addEventListener('click', () => {
     $('search').value = '';
