@@ -51,7 +51,7 @@ changelog:
 release:
   draft: false
   gitea:
-    owner: dsiebel
+    owner: OSS
     name: mqttree
 
 gitea_urls:
