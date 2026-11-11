@@ -32,6 +32,8 @@ First release.
   stack with a local Mosquitto broker and Docker getting-started documentation.
 - CI builds and smoke-tests the Docker image on every push and pull request, and
   publishes release tags to the Forgejo container registry.
+- Renovate workflow and configuration, covering the CI images, Dockerfile,
+  Compose file, Go modules and E2E dependencies.
 
 ### Changed
 

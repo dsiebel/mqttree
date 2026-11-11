@@ -1,0 +1,22 @@
+---
+# Runs Renovate against this repository on the Woodpecker cron named `renovate`
+# or a manual trigger. Renovate opens update pull requests; it does not merge.
+when:
+  - event: 'cron'
+    cron: 'renovate'
+  - event: 'manual'
+
+steps:
+  - name: 'renovate'
+    image: 'renovate/renovate:44.186.7'
+    pull: true
+    environment:
+      RENOVATE_PLATFORM: 'forgejo'
+      RENOVATE_ENDPOINT: 'https://forgejo.home.dsiebel.de/api/v1'
+      RENOVATE_TOKEN:
+        from_secret: 'renovate_token'
+      RENOVATE_GITHUB_COM_TOKEN:
+        from_secret: 'renovate_github_com_token'
+    commands:
+      - 'export RENOVATE_CONFIG=$(printf "{\"hostRules\":[{\"matchHost\":\"api.github.com\",\"token\":\"%s\"}]}" "$RENOVATE_GITHUB_COM_TOKEN")'
+      - 'renovate "$CI_REPO"'
