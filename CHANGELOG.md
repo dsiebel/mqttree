@@ -28,6 +28,13 @@ First release.
   a connection.
 - Dark and light themes, resizable tree pane, compact mobile layout.
 - Single static binary, embedded UI, SQLite storage, `/healthz` endpoint.
+- Multi-stage Docker image running as an unprivileged user, plus a Compose
+  stack with a local Mosquitto broker and Docker getting-started documentation.
+
+### Changed
+
+- Toolchain refresh: Go 1.27.3, Alpine 3.24.4, current Go module
+  dependencies, Playwright 1.65, Goreleaser 2.20.1 and Mosquitto 2.1.2.
 
 ### Security
 

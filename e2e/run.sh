@@ -16,7 +16,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker run -d --rm --name "$container" -p "127.0.0.1:${broker_port}:1883" eclipse-mosquitto:2 \
+docker run -d --rm --name "$container" -p "127.0.0.1:${broker_port}:1883" eclipse-mosquitto:2.1.2-alpine \
     sh -c 'printf "listener 1883\nallow_anonymous true\n" > /tmp/mosquitto.conf && exec mosquitto -c /tmp/mosquitto.conf' >/dev/null
 
 (cd "$root" && go build -trimpath -o /tmp/mqttree-e2e .)

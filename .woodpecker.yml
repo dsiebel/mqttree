@@ -3,20 +3,20 @@ when:
 
 steps:
   - name: test
-    image: golang:1.24-alpine
+    image: golang:1.27.3-alpine3.24
     commands:
       - test -z "$(gofmt -l .)"
       - go vet ./...
       - go test ./...
 
   - name: build
-    image: goreleaser/goreleaser:v2.20.0
+    image: goreleaser/goreleaser:v2.20.1
     depends_on: [test]
     commands:
       - goreleaser build --snapshot --clean
 
   - name: e2e
-    image: mcr.microsoft.com/playwright:v1.49.1-noble
+    image: mcr.microsoft.com/playwright:v1.65.0-noble
     depends_on: [build]
     commands:
       - apt-get update -qq && apt-get install -y -qq --no-install-recommends mosquitto >/dev/null
@@ -30,7 +30,7 @@ steps:
       - cd e2e && npm ci && npx playwright test
 
   - name: release
-    image: goreleaser/goreleaser:v2.20.0
+    image: goreleaser/goreleaser:v2.20.1
     depends_on: [build, e2e]
     when:
       - event: tag

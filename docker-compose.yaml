@@ -1,0 +1,47 @@
+# Local test stack: mqttree plus a throwaway Mosquitto broker.
+#
+#   docker compose up -d --build
+#   open http://127.0.0.1:8080
+#
+# Add a connection in the UI with host `mosquitto` and port `1883`; the broker
+# is anonymous and both ports are published on loopback only.
+name: mqttree
+
+services:
+  mqttree:
+    build:
+      context: .
+      args:
+        VERSION: ${MQTTREE_VERSION:-dev}
+        COMMIT: ${MQTTREE_COMMIT:-none}
+        DATE: ${MQTTREE_DATE:-unknown}
+    image: mqttree:${MQTTREE_VERSION:-dev}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      MQTTREE_LOG_LEVEL: ${MQTTREE_LOG_LEVEL:-info}
+    volumes:
+      - mqttree-data:/data
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+
+  mosquitto:
+    image: eclipse-mosquitto:2.1.2-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1883:1883"
+    volumes:
+      - ./dev/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      # Uses a $SYS topic: it is retained by the broker and `#` subscriptions
+      # never match `$`-prefixed topics, so the probe does not pollute the tree.
+      test: ["CMD-SHELL", "mosquitto_sub -h 127.0.0.1 -t '$$SYS/broker/version' -C 1 -W 3"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  mqttree-data:

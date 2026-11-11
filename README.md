@@ -33,15 +33,15 @@ SQLite file and one HTTP port.
 
 ## Quick start
 
-Docker:
+Docker Compose, with a local Mosquitto broker for testing:
 
 ```sh
-docker build -t mqttree:1.0.0 .
-docker run -d --name mqttree \
-  -p 127.0.0.1:8080:8080 \
-  -v mqttree-data:/data \
-  mqttree:1.0.0
+docker compose up -d --build
 ```
+
+Open <http://127.0.0.1:8080> and add a connection with host `mosquitto`, port
+`1883`. See [docs/docker.md](docs/docker.md) for the standalone `docker run`
+command, configuration, backups and reverse-proxy notes.
 
 Binary: download the archive for your platform from the release page and run it.
 
@@ -51,7 +51,7 @@ tar xzf mqttree_1.0.0_linux_amd64.tar.gz
 ./mqttree
 ```
 
-From source (Go 1.24+):
+From source (Go 1.27+):
 
 ```sh
 go build -trimpath -o mqttree .

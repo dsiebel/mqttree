@@ -2,7 +2,7 @@
   "name": "mqttree-e2e",
   "private": true,
   "devDependencies": {
-    "@playwright/test": "1.49.1"
+    "@playwright/test": "1.65.0"
   },
   "scripts": {
     "screenshots": "node screenshots.js",
