@@ -1,0 +1,98 @@
+when:
+  event: [push, pull_request, tag]
+
+steps:
+  - name: test
+    image: golang:1.27.3-alpine3.24
+    commands:
+      - test -z "$(gofmt -l .)"
+      - go vet ./...
+      - go test ./...
+
+  - name: build
+    image: goreleaser/goreleaser:v2.20.1
+    depends_on: [test]
+    commands:
+      - goreleaser build --snapshot --clean
+
+  # Build the Docker image without pushing it. `output: type=local` exports the
+  # runtime stage's filesystem into the workspace so the next step can exercise
+  # the binary that actually ends up in the image.
+  - name: docker-build
+    image: woodpeckerci/plugin-docker-buildx:6.1.2
+    depends_on: [test]
+    settings:
+      repo: forgejo.home.dsiebel.de/oss/mqttree
+      dockerfile: Dockerfile
+      dry_run: true
+      output: type=local,dest=.ci-image
+
+  # Smoke test the exported image filesystem: static binary runs, creates its
+  # data directory contents and serves the UI and health endpoint.
+  - name: docker-test
+    image: alpine:3.24.4
+    depends_on: [docker-build]
+    commands:
+      - test -x .ci-image/usr/local/bin/mqttree
+      - test -d .ci-image/data
+      - grep -q '^mqttree:' .ci-image/etc/passwd
+      - .ci-image/usr/local/bin/mqttree -version
+      - .ci-image/usr/local/bin/mqttree -version | grep -qx 'mqttree dev (none, unknown)'
+      - mkdir -p /tmp/mqttree-data
+      - MQTTREE_LISTEN=127.0.0.1:18080 MQTTREE_DATA_DIR=/tmp/mqttree-data MQTTREE_SECRET_KEY_FILE=/tmp/mqttree-data/secret.key .ci-image/usr/local/bin/mqttree >/tmp/mqttree.log 2>&1 &
+      - for i in $(seq 1 60); do wget -qO- http://127.0.0.1:18080/healthz >/dev/null && break; sleep 0.5; done
+      - test "$(wget -qO- http://127.0.0.1:18080/healthz)" = ok || { cat /tmp/mqttree.log; exit 1; }
+      - wget -qO- http://127.0.0.1:18080/ | grep -q '<title>mqttree</title>'
+      - test -s /tmp/mqttree-data/secret.key
+      - test -f /tmp/mqttree-data/mqttree.db
+      - cat /tmp/mqttree.log
+      - rm -rf .ci-image
+
+  - name: e2e
+    image: mcr.microsoft.com/playwright:v1.65.0-noble
+    depends_on: [build]
+    commands:
+      - apt-get update -qq && apt-get install -y -qq --no-install-recommends mosquitto >/dev/null
+      - printf 'listener 1883\nallow_anonymous true\n' > /tmp/mosquitto.conf
+      - mosquitto -c /tmp/mosquitto.conf -d
+      - BIN=$(find dist -type f -path '*linux_amd64*' -name mqttree | head -1) && echo "using $BIN"
+      - mkdir -p /tmp/mqttree-data
+      - MQTTREE_DATA_DIR=/tmp/mqttree-data MQTTREE_SECRET_KEY_FILE=/tmp/mqttree-data/secret.key "$BIN" >/tmp/mqttree.log 2>&1 &
+      - for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8080/healthz >/dev/null && break; sleep 0.5; done
+      - curl -fsS http://127.0.0.1:8080/healthz >/dev/null || { cat /tmp/mqttree.log; exit 1; }
+      - cd e2e && npm ci && npx playwright test
+
+  # Publish the tested sources as a multi-arch image to the Forgejo package
+  # registry, tagged with the release tag that triggered the pipeline.
+  - name: publish
+    image: woodpeckerci/plugin-docker-buildx:6.1.2
+    depends_on: [docker-test]
+    when:
+      - event: tag
+    settings:
+      registry: forgejo.home.dsiebel.de
+      repo: forgejo.home.dsiebel.de/oss/mqttree
+      dockerfile: Dockerfile
+      platforms: linux/amd64,linux/arm64
+      tags: ${CI_COMMIT_TAG}
+      provenance: "false"
+      # Forgejo resolves the token owner from the password field; the username is
+      # ignored, but the plugin skips `docker login` when it is empty.
+      username: ${CI_REPO_OWNER}
+      password:
+        from_secret: forgejo_token
+      build_args:
+        VERSION: ${CI_COMMIT_TAG}
+        COMMIT: ${CI_COMMIT_SHA}
+        DATE: ${CI_PIPELINE_CREATED}
+
+  - name: release
+    image: goreleaser/goreleaser:v2.20.1
+    depends_on: [build, e2e]
+    when:
+      - event: tag
+    environment:
+      GITEA_TOKEN:
+        from_secret: forgejo_token
+    commands:
+      - goreleaser release --clean

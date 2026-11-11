@@ -1,5 +1,6 @@
 .git
 dist
+.ci-image
 e2e
 dev
 docs
@@ -8,5 +9,5 @@ Dockerfile
 .dockerignore
 docker-compose.yaml
 compose.yaml
-.woodpecker.yml
+.woodpecker
 .goreleaser.yaml

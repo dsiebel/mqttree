@@ -52,6 +52,34 @@ Build args `VERSION`, `COMMIT` and `DATE` override the version reported by
 docker buildx build --platform linux/amd64,linux/arm64 -t mqttree:1.0.0 .
 ```
 
+## Published images
+
+Every push and pull request builds the image and smoke-tests it without pushing
+anything. Release tags publish the image to the Forgejo container registry under
+the tag name, for `linux/amd64` and `linux/arm64`:
+
+```sh
+docker pull forgejo.home.dsiebel.de/oss/mqttree:v1.0.0
+```
+
+The build steps use `woodpeckerci/plugin-docker-buildx:6.1.2`, which runs a
+nested Docker daemon and therefore needs privileged mode. Allow that plugin on
+the Woodpecker server instead of trusting the repository:
+
+```
+WOODPECKER_PLUGINS_PRIVILEGED=woodpeckerci/plugin-docker-buildx
+```
+
+Without a tag the entry accepts every plugin version, so Renovate can bump the
+image without a matching server change. Add a tag to the entry to require an
+exact version instead.
+
+The publish step authenticates to the registry with the existing `forgejo_token`
+secret, which needs the `write:package` scope. No username secret is needed:
+Forgejo resolves the token owner from the password field of the basic-auth
+credentials and ignores the supplied username, so the workflow passes
+`${CI_REPO_OWNER}` to satisfy the plugin's non-empty username check.
+
 ## Configuration
 
 The image sets container-appropriate defaults. Override them with `-e` or the

@@ -30,9 +30,13 @@ First release.
 - Single static binary, embedded UI, SQLite storage, `/healthz` endpoint.
 - Multi-stage Docker image running as an unprivileged user, plus a Compose
   stack with a local Mosquitto broker and Docker getting-started documentation.
+- CI builds and smoke-tests the Docker image on every push and pull request, and
+  publishes release tags to the Forgejo container registry.
 
 ### Changed
 
+- Pipeline configuration moved from `.woodpecker.yml` into `.woodpecker/` so a
+  separate scheduled Renovate workflow can live next to it.
 - Toolchain refresh: Go 1.27.3, Alpine 3.24.4, current Go module
   dependencies, Playwright 1.65, Goreleaser 2.20.1 and Mosquitto 2.1.2.
 
