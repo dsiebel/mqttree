@@ -22,10 +22,11 @@ steps:
       - apt-get update -qq && apt-get install -y -qq --no-install-recommends mosquitto >/dev/null
       - printf 'listener 1883\nallow_anonymous true\n' > /tmp/mosquitto.conf
       - mosquitto -c /tmp/mosquitto.conf -d
-      - BIN=$(find dist -type f -name mqttree | head -1) && echo "using $BIN"
+      - BIN=$(find dist -type f -path '*linux_amd64*' -name mqttree | head -1) && echo "using $BIN"
       - mkdir -p /tmp/mqttree-data
       - MQTTREE_DATA_DIR=/tmp/mqttree-data MQTTREE_SECRET_KEY_FILE=/tmp/mqttree-data/secret.key "$BIN" >/tmp/mqttree.log 2>&1 &
       - for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8080/healthz >/dev/null && break; sleep 0.5; done
+      - curl -fsS http://127.0.0.1:8080/healthz >/dev/null || { cat /tmp/mqttree.log; exit 1; }
       - cd e2e && npm ci && npx playwright test
 
   - name: release
