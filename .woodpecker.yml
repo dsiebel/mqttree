@@ -31,7 +31,7 @@ steps:
 
   - name: release
     image: goreleaser/goreleaser:v2.20.0
-    depends_on: [test]
+    depends_on: [build, e2e]
     when:
       - event: tag
     environment:
