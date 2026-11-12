@@ -50,17 +50,38 @@ steps:
       - curl -fsS http://127.0.0.1:8080/healthz >/dev/null || { cat /tmp/mqttree.log; exit 1; }
       - cd e2e && npm ci && npx playwright test
 
+  # Woodpecker reports CI_COMMIT_SHA as the annotated tag object. Resolve the
+  # peeled commit and bake it into a generated Dockerfile so the published image
+  # reports the source revision, not the tag object.
+  - name: resolve-commit
+    image: alpine:3.24.4
+    when:
+      - event: tag
+    commands:
+      - apk add --no-cache git >/dev/null
+      - |
+        set -eu
+        commit=$(git rev-parse "$CI_COMMIT_SHA^{commit}" 2>/dev/null || true)
+        if [ -z "$commit" ]; then
+          commit=$(git rev-parse "$CI_COMMIT_TAG^{commit}" 2>/dev/null || true)
+        fi
+        [ -n "$commit" ] || { echo "cannot resolve commit for $CI_COMMIT_TAG" >&2; exit 1; }
+        mkdir -p .ci
+        sed "s|^ARG COMMIT=.*|ARG COMMIT=$commit|" Dockerfile > .ci/Dockerfile
+        grep -q "^ARG COMMIT=$commit$" .ci/Dockerfile
+        echo "image revision: $commit"
+
   # Publish the tested sources as a multi-arch image to the Forgejo package
   # registry, tagged with the release tag that triggered the pipeline.
   - name: publish
     image: woodpeckerci/plugin-docker-buildx:6.1.2
-    depends_on: [docker-test]
+    depends_on: [docker-test, resolve-commit]
     when:
       - event: tag
     settings:
       registry: forgejo.home.dsiebel.de
       repo: forgejo.home.dsiebel.de/oss/mqttree
-      dockerfile: Dockerfile
+      dockerfile: .ci/Dockerfile
       platforms: linux/amd64,linux/arm64
       tags: ${CI_COMMIT_TAG}
       provenance: "false"
@@ -71,7 +92,6 @@ steps:
         from_secret: forgejo_token
       build_args:
         VERSION: ${CI_COMMIT_TAG}
-        COMMIT: ${CI_COMMIT_SHA}
         DATE: ${CI_PIPELINE_CREATED}
 
   - name: release
