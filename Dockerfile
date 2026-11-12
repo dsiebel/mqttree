@@ -40,6 +40,7 @@ ARG VERSION=dev
 ARG COMMIT=none
 
 LABEL org.opencontainers.image.source="https://github.com/dsiebel/mqttree" \
+      org.opencontainers.image.url="https://github.com/dsiebel/mqttree" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${COMMIT}" \
       org.opencontainers.image.licenses="Apache-2.0"
