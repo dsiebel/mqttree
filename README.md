@@ -116,6 +116,15 @@ history for the selected connection and keeps the connection itself.
   multi-tenant service.
 - Broker-side WebSocket transports and client certificates are not implemented.
 
+## Repository
+
+The GitHub repository is a read-only mirror of the project's internal Forgejo
+repository. Commits, tags, releases, release artifacts and container images are
+published there 1:1 from the forge, which remains the source of truth.
+
+Issues are enabled on GitHub. Pull requests are disabled: changes are reviewed
+and merged on the forge, so please open an issue to discuss a change first.
+
 ## Development
 
 ```sh
