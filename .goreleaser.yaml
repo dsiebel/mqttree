@@ -48,7 +48,11 @@ changelog:
       - '^ci:'
       - '^chore:'
 
+# Forgejo is the canonical release target; Woodpecker copies the generated
+# release artifacts to GitHub after this release is published.
 release:
+  # Mark semver prerelease tags such as v1.0.0-rc.1 as prereleases.
+  prerelease: auto
   draft: false
   gitea:
     owner: OSS

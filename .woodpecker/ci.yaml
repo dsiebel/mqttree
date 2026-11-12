@@ -33,19 +33,7 @@ steps:
     image: alpine:3.24.4
     depends_on: [docker-build]
     commands:
-      - test -x .ci-image/usr/local/bin/mqttree
-      - test -d .ci-image/data
-      - grep -q '^mqttree:' .ci-image/etc/passwd
-      - .ci-image/usr/local/bin/mqttree -version
-      - .ci-image/usr/local/bin/mqttree -version | grep -qx 'mqttree dev (none, unknown)'
-      - mkdir -p /tmp/mqttree-data
-      - MQTTREE_LISTEN=127.0.0.1:18080 MQTTREE_DATA_DIR=/tmp/mqttree-data MQTTREE_SECRET_KEY_FILE=/tmp/mqttree-data/secret.key .ci-image/usr/local/bin/mqttree >/tmp/mqttree.log 2>&1 &
-      - for i in $(seq 1 60); do wget -qO- http://127.0.0.1:18080/healthz >/dev/null && break; sleep 0.5; done
-      - test "$(wget -qO- http://127.0.0.1:18080/healthz)" = ok || { cat /tmp/mqttree.log; exit 1; }
-      - wget -qO- http://127.0.0.1:18080/ | grep -q '<title>mqttree</title>'
-      - test -s /tmp/mqttree-data/secret.key
-      - test -f /tmp/mqttree-data/mqttree.db
-      - cat /tmp/mqttree.log
+      - ./dev/smoke-image.sh .ci-image
       - rm -rf .ci-image
 
   - name: e2e
@@ -96,3 +84,102 @@ steps:
         from_secret: forgejo_token
     commands:
       - goreleaser release --clean
+
+  # Trigger the push mirror after the short test gate so it can sync while the
+  # build and e2e jobs run. Tags are always mirrored regardless of branch filter;
+  # the release step also polls for the exact mirrored commit.
+  - name: sync-github
+    image: alpine:3.24.4
+    depends_on: [test]
+    when:
+      - event: tag
+    environment:
+      GITEA_TOKEN:
+        from_secret: forgejo_token
+    commands:
+      - apk add --no-cache curl >/dev/null
+      - |
+        curl -fsS -X POST -H "Authorization: token $GITEA_TOKEN" \
+          "https://forgejo.home.dsiebel.de/api/v1/repos/$CI_REPO/push_mirrors-sync" \
+          || echo "push-mirror sync trigger failed; tag poll will verify propagation"
+
+  # Publish the archives and checksums that GoReleaser just built. Reuse its
+  # Forgejo release body so both releases have the same generated changelog.
+  - name: github-release
+    image: alpine:3.24.4
+    depends_on: [release, sync-github]
+    when:
+      - event: tag
+    environment:
+      GH_TOKEN:
+        from_secret: github_token
+      GITEA_TOKEN:
+        from_secret: forgejo_token
+      GH_REPO: dsiebel/mqttree
+    commands:
+      - |
+        set -eu
+        apk add --no-cache curl jq github-cli >/dev/null
+
+        tries=0
+        sha=""
+        while [ "$tries" -lt 60 ]; do
+          sha=$(gh api "repos/$GH_REPO/commits/$CI_COMMIT_TAG" --jq .sha 2>/dev/null || true)
+          [ "$sha" = "$CI_COMMIT_SHA" ] && break
+          tries=$((tries + 1))
+          sleep 10
+        done
+        if [ "$sha" != "$CI_COMMIT_SHA" ]; then
+          echo "tag $CI_COMMIT_TAG not on GitHub after 10 minutes (got ${sha:-missing})" >&2
+          exit 1
+        fi
+
+        curl -fsSL -H "Authorization: token $GITEA_TOKEN" \
+          "https://forgejo.home.dsiebel.de/api/v1/repos/$CI_REPO/releases/tags/$CI_COMMIT_TAG" \
+          | jq -r '.body // ""' > release-notes.md
+
+        case "$CI_COMMIT_TAG" in
+          *-*) is_prerelease=true ;;
+          *) is_prerelease=false ;;
+        esac
+
+        if gh release view "$CI_COMMIT_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+          gh release upload "$CI_COMMIT_TAG" dist/*.tar.gz dist/checksums.txt \
+            --repo "$GH_REPO" --clobber
+          if [ "$is_prerelease" = true ]; then
+            gh release edit "$CI_COMMIT_TAG" --repo "$GH_REPO" \
+              --notes-file release-notes.md --prerelease
+          else
+            gh release edit "$CI_COMMIT_TAG" --repo "$GH_REPO" \
+              --notes-file release-notes.md
+          fi
+        elif [ "$is_prerelease" = true ]; then
+          gh release create "$CI_COMMIT_TAG" dist/*.tar.gz dist/checksums.txt \
+            --repo "$GH_REPO" --title "$CI_COMMIT_TAG" \
+            --notes-file release-notes.md --verify-tag --prerelease
+        else
+          gh release create "$CI_COMMIT_TAG" dist/*.tar.gz dist/checksums.txt \
+            --repo "$GH_REPO" --title "$CI_COMMIT_TAG" \
+            --notes-file release-notes.md --verify-tag
+        fi
+
+
+  # Copy the already-built multi-arch image to GHCR. No rebuild; digests and
+  # platform manifests are preserved by skopeo --all.
+  - name: github-image
+    image: quay.io/skopeo/stable:v1.24.1
+    depends_on: [publish]
+    when:
+      - event: tag
+    environment:
+      GITHUB_TOKEN:
+        from_secret: github_token
+      GITEA_TOKEN:
+        from_secret: forgejo_token
+    commands:
+      - |
+        skopeo copy --all --preserve-digests \
+          --src-creds "$CI_REPO_OWNER:$GITEA_TOKEN" \
+          --dest-creds "dsiebel:$GITHUB_TOKEN" \
+          "docker://forgejo.home.dsiebel.de/oss/mqttree:$CI_COMMIT_TAG" \
+          "docker://ghcr.io/dsiebel/mqttree:$CI_COMMIT_TAG"

@@ -55,12 +55,17 @@ docker buildx build --platform linux/amd64,linux/arm64 -t mqttree:1.0.0 .
 ## Published images
 
 Every push and pull request builds the image and smoke-tests it without pushing
-anything. Release tags publish the image to the Forgejo container registry under
-the tag name, for `linux/amd64` and `linux/arm64`:
+anything. Release tags publish the image to the Forgejo container registry and
+to the GitHub container registry under the tag name, for `linux/amd64` and
+`linux/arm64`:
 
 ```sh
 docker pull forgejo.home.dsiebel.de/oss/mqttree:v1.0.0
+docker pull ghcr.io/dsiebel/mqttree:v1.0.0
 ```
+
+The GitHub image is a registry-to-registry copy of the tested Forgejo image, so
+both tags refer to the same manifest.
 
 The build steps use `woodpeckerci/plugin-docker-buildx:6.1.2`, which runs a
 nested Docker daemon and therefore needs privileged mode. Allow that plugin on

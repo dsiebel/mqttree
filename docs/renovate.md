@@ -29,7 +29,7 @@ regex matcher is needed:
 | `.woodpecker/ci.yaml`, `.woodpecker/renovate.yaml` | `woodpecker` | step images |
 | `Dockerfile` | `dockerfile` | base images and `apk` packages |
 | `docker-compose.yaml` | `docker-compose` | Mosquitto image |
-| `go.mod` | `gomod` | modules and the `go` directive |
+| `go.mod` | `gomod` | modules and the `go`/`toolchain` directives |
 | `e2e/package.json` | `npm` | `@playwright/test` |
 
 Image references must stay literal `image:` values, because the Woodpecker

@@ -32,6 +32,9 @@ First release.
   stack with a local Mosquitto broker and Docker getting-started documentation.
 - CI builds and smoke-tests the Docker image on every push and pull request, and
   publishes release tags to the Forgejo container registry.
+- Release tags also publish the tested archives, checksums and multi-arch image
+  to GitHub: Woodpecker creates the GitHub release from the Forgejo changelog
+  and copies the image to the GitHub container registry.
 - Renovate workflow and configuration, covering the CI images, Dockerfile,
   Compose file, Go modules and E2E dependencies.
 

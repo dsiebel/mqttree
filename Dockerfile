@@ -36,6 +36,14 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # ---- runtime ----------------------------------------------------------------
 FROM alpine:3.24.4
 
+ARG VERSION=dev
+ARG COMMIT=none
+
+LABEL org.opencontainers.image.source="https://github.com/dsiebel/mqttree" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${COMMIT}" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
 # ca-certificates for broker TLS, tzdata for timestamp rendering. The fixed UID
 # keeps bind-mounted volume permissions predictable.
 RUN apk add --no-cache ca-certificates tzdata \
