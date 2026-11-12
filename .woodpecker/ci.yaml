@@ -121,10 +121,12 @@ steps:
         set -eu
         apk add --no-cache curl jq github-cli >/dev/null
 
+        # Woodpecker reports an annotated tag's object SHA in CI_COMMIT_SHA, so
+        # compare the mirrored tag object, not the peeled commit.
         tries=0
         sha=""
         while [ "$tries" -lt 60 ]; do
-          sha=$(gh api "repos/$GH_REPO/commits/$CI_COMMIT_TAG" --jq .sha 2>/dev/null || true)
+          sha=$(gh api "repos/$GH_REPO/git/ref/tags/$CI_COMMIT_TAG" --jq .object.sha 2>/dev/null || true)
           [ "$sha" = "$CI_COMMIT_SHA" ] && break
           tries=$((tries + 1))
           sleep 10
