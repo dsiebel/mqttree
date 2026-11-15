@@ -1,5 +1,11 @@
+# Feature branches are validated once, via the pull_request event. A branch push
+# only triggers CI on main, so pushing to a branch with an open pull request does
+# not run the whole pipeline twice.
 when:
-  event: [push, pull_request, tag]
+  - event: push
+    branch: main
+  - event: pull_request
+  - event: tag
 
 steps:
   - name: test
