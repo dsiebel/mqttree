@@ -43,7 +43,7 @@ steps:
       - rm -rf .ci-image
 
   - name: e2e
-    image: mcr.microsoft.com/playwright:v1.65.0-noble
+    image: mcr.microsoft.com/playwright:v1.65.1-noble
     depends_on: [build]
     commands:
       - apt-get update -qq && apt-get install -y -qq --no-install-recommends mosquitto >/dev/null
