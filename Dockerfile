@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.29
 
 # ---- build ------------------------------------------------------------------
 FROM golang:1.27.4-alpine3.24 AS build
