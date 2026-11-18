@@ -28,7 +28,7 @@ services:
         condition: service_healthy
 
   mosquitto:
-    image: eclipse-mosquitto:2.1.2-alpine
+    image: eclipse-mosquitto:2.1.4-alpine
     restart: unless-stopped
     ports:
       - "127.0.0.1:1883:1883"
