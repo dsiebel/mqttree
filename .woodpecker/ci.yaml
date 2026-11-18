@@ -196,7 +196,7 @@ steps:
   # Copy the already-built multi-arch image to GHCR. No rebuild; digests and
   # platform manifests are preserved by skopeo --all.
   - name: github-image
-    image: quay.io/skopeo/stable:v1.24.1
+    image: quay.io/skopeo/stable:v1.25.1
     depends_on: [publish]
     when:
       - event: tag
