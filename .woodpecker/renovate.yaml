@@ -8,7 +8,7 @@ when:
 
 steps:
   - name: 'renovate'
-    image: 'renovate/renovate:44.186.7'
+    image: 'renovate/renovate:45.3.2'
     pull: true
     environment:
       RENOVATE_PLATFORM: 'forgejo'
